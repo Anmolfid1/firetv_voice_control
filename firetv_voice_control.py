@@ -106,6 +106,11 @@ COMMAND_ALIASES = {
     "droite": "right"    # French
 }
 
+# Global flags
+continuous_mode = False
+command_queue = []
+stop_continuous_listening = False
+
 def save_config(ip):
     """Save Fire TV IP address to config file"""
     config = {"device_ip": ip}
@@ -187,7 +192,12 @@ def send_command(command):
 
 def listen_for_command():
     """Use Termux API to capture voice and convert to text"""
-    print("\nListening for command... (say 'exit' to quit)")
+    global continuous_mode
+    
+    if continuous_mode:
+        print("\nListening continuously... (say 'stop listening' or 'exit continuous' to stop)")
+    else:
+        print("\nListening for command... (say 'exit' to quit, 'continuous' to enter continuous mode)")
     
     # Use Termux API for speech recognition
     try:
@@ -256,6 +266,89 @@ def try_alternative_recognition():
         print(f"Error with alternative method: {str(e)}")
         return None
 
+def continuous_listener():
+    """Function to continuously listen for commands in a separate thread"""
+    global stop_continuous_listening, command_queue, continuous_mode
+    
+    while not stop_continuous_listening:
+        try:
+            # First attempt with termux-speech-to-text
+            result = subprocess.run(
+                "termux-speech-to-text", 
+                shell=True, 
+                capture_output=True, 
+                text=True,
+                timeout=5  # Shorter timeout for responsiveness
+            )
+            
+            if result.returncode == 0:
+                command = result.stdout.strip().lower()
+                if command:
+                    print(f"I heard: {command}")
+                    
+                    # Check for exit commands
+                    if command in ["stop listening", "exit continuous", "stop continuous"]:
+                        print("Exiting continuous listening mode...")
+                        stop_continuous_listening = True
+                        continuous_mode = False
+                        break
+                    
+                    # Add command to queue
+                    command_queue.append(command)
+            
+            # Small delay to prevent high CPU usage
+            time.sleep(0.1)
+            
+        except Exception as e:
+            print(f"Continuous listening error: {str(e)}")
+            time.sleep(2)  # Longer delay after error
+
+def command_processor():
+    """Function to process commands from queue in a separate thread"""
+    global command_queue, stop_continuous_listening
+    
+    while not stop_continuous_listening:
+        # Process any commands in queue
+        if command_queue:
+            cmd = command_queue.pop(0)  # Get and remove first command
+            send_command(cmd)
+        
+        # Small delay to prevent high CPU usage
+        time.sleep(0.1)
+
+def start_continuous_mode():
+    """Start continuous listening mode with multiple threads"""
+    global stop_continuous_listening, continuous_mode
+    
+    print("\n==== Starting Continuous Listening Mode ====")
+    print("I'll keep listening and executing commands until you say 'stop listening'")
+    print("Speak clearly, one command at a time")
+    
+    # Reset flags
+    stop_continuous_listening = False
+    continuous_mode = True
+    
+    # Start listener thread
+    listener_thread = threading.Thread(target=continuous_listener)
+    listener_thread.daemon = True
+    listener_thread.start()
+    
+    # Start command processor thread
+    processor_thread = threading.Thread(target=command_processor)
+    processor_thread.daemon = True
+    processor_thread.start()
+    
+    # Wait for stop flag
+    while continuous_mode and not stop_continuous_listening:
+        time.sleep(0.5)
+    
+    # Wait for threads to finish
+    stop_continuous_listening = True
+    listener_thread.join(timeout=1)
+    processor_thread.join(timeout=1)
+    
+    print("Exited continuous listening mode")
+
 def show_help():
     """Display available commands"""
     print("\n==== Available Voice Commands ====")
@@ -266,6 +359,8 @@ def show_help():
         print(f"• {alias} → {cmd}")
     print("\n• exit (quits the program)")
     print("• help (shows this menu)")
+    print("• continuous (enters continuous listening mode)")
+    print("• stop listening (exits continuous mode)")
 
 def main():
     print("\n==== Fire TV Voice Control ====")
@@ -288,6 +383,9 @@ def main():
             break
         elif command == "help":
             show_help()
+        elif command in ["continuous", "continuous mode", "listen continuously", "keep listening"]:
+            # Enter continuous listening mode
+            start_continuous_mode()
         else:
             send_command(command)
 
