@@ -99,6 +99,17 @@ This script allows you to control your Amazon Fire TV Stick with voice commands 
    - 0: MENU
    - E: EXIT
 
+## Continuous Listening Mode
+
+You can now use continuous listening mode to control your Fire TV without waiting between commands!
+
+1. Say "continuous" or "continuous mode" to enter this mode
+2. The script will keep listening continuously and execute commands as you speak them
+3. You can rapidly say commands like "up up up right select" and the script will execute each one
+4. To exit continuous mode, say "stop listening" or "exit continuous"
+
+This mode is perfect for quick navigation through menus or when you need to press the same button multiple times.
+
 ## Troubleshooting
 
 - If the script says "Command not found", make sure you have installed all required packages
@@ -133,3 +144,4 @@ You can easily customize the script for your own needs:
 - Your Fire TV IP might change if you restart your router (DHCP)
 - For better results, speak clearly and in a quiet environment
 - You can add your own command aliases by editing the COMMAND_ALIASES dictionary in the script
+- In continuous mode, speak clearly and pause slightly between different commands for best results
